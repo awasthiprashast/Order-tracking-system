@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="description" content="ODTS: a full-stack order and delivery tracking demo with customer, admin and delivery-agent roles."/>
 <title>ODTS — Order & Delivery Tracking System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
@@ -95,7 +96,7 @@ nav{width:220px;background:var(--surface);border-right:1px solid var(--border);
 .nav-btn:hover{background:var(--surface2);color:var(--text)}
 .nav-btn.active{background:rgba(249,115,22,.12);color:var(--accent)}
 .nav-btn .icon{font-size:18px;width:22px;text-align:center}
-content{flex:1;padding:28px;overflow-y:auto;min-height:0}
+#content{flex:1;padding:28px;overflow-y:auto;min-height:0}
 
 /* ── PAGES ── */
 .page{display:none}
@@ -191,6 +192,16 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
 .empty-state .emoji{font-size:48px;margin-bottom:12px}
 .empty-state p{font-size:14px}
+
+@media (max-width:768px){
+  .main{flex-direction:column}
+  nav{width:100%;display:flex;flex-direction:row;overflow-x:auto;border-right:none;border-bottom:1px solid var(--border);padding:8px}
+  nav .nav-section{display:none}
+  .nav-btn{white-space:nowrap;width:auto}
+  #content{padding:16px}
+  table{display:block;overflow-x:auto}
+  .auth-card{width:calc(100vw - 32px)}
+}
 </style>
 </head>
 <body>
@@ -265,7 +276,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </header>
   <div class="main">
     <nav id="sidebar"></nav>
-    <content id="content">
+    <main id="content">
       <!-- DASHBOARD -->
       <div id="page-dashboard" class="page">
         <div class="page-header">
@@ -330,7 +341,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
           <div id="report-orders-table"></div>
         </div>
       </div>
-    </content>
+    </main>
   </div>
 </div>
 
@@ -363,7 +374,10 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <div class="toast" id="toast"></div>
 
 <script>
-const API = 'http://localhost:8000';
+// Same-origin API in production; fall back to a local backend when opened from disk.
+const API = location.protocol === 'file:' ? 'http://localhost:8000/api' : '/api';
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let productMap = {};
 let session = null;
 let cart = {};
 let assignTargetOrder = null;
@@ -374,8 +388,13 @@ async function api(method, path, body) {
   if (session?.token) opts.headers['Authorization'] = 'Bearer ' + session.token;
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(API + path, opts);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || 'Error');
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* non-JSON response */ }
+  if (!res.ok) {
+    const d = data && data.detail;
+    const msg = Array.isArray(d) ? d.map(x => (x.msg || '').replace(/^Value error, /, '')).join('; ') : d;
+    throw new Error(msg || `Request failed (${res.status})`);
+  }
   return data;
 }
 
@@ -389,8 +408,8 @@ function toast(msg, type='success') {
 function statusBadge(s) {
   const map = { Placed:'placed', Confirmed:'confirmed', Dispatched:'dispatched',
     'Out for Delivery':'out', Delivered:'delivered', Cancelled:'cancelled',
-    Pending:'pending', Assigned:'assigned', Completed:'completed' };
-  return `<span class="badge badge-${map[s]||'pending'}">${s}</span>`;
+    Pending:'pending', Assigned:'assigned', Completed:'completed', Refunded:'cancelled' };
+  return `<span class="badge badge-${map[s]||'pending'}">${esc(s)}</span>`;
 }
 
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—'; }
@@ -561,7 +580,7 @@ async function loadProducts() {
   const products = await api('GET','/products');
   document.getElementById('products-list').innerHTML = products.map(p=>`
     <div class="product-card">
-      <div class="product-name">${p.product_name}</div>
+      <div class="product-name">${esc(p.product_name)}</div>
       <div class="product-price">${fmtRs(p.price)}</div>
       <div class="product-stock">Stock: ${p.stock_quantity} units</div>
     </div>`).join('');
@@ -570,21 +589,23 @@ async function loadProducts() {
 async function loadPlaceOrder() {
   cart = {};
   const products = await api('GET','/products');
+  productMap = Object.fromEntries(products.map(p=>[p.product_id,p]));
   const grid = document.getElementById('place-products');
   grid.innerHTML = products.map(p=>`
     <div class="product-card" id="pc-${p.product_id}">
-      <div class="product-name">${p.product_name}</div>
+      <div class="product-name">${esc(p.product_name)}</div>
       <div class="product-price">${fmtRs(p.price)}</div>
       <div class="product-stock">Stock: ${p.stock_quantity} units</div>
       <div class="product-qty">
-        <button class="qty-btn" onclick="changeQty(${p.product_id},-1,${p.price},'${p.product_name}',${p.stock_quantity})">−</button>
+        <button class="qty-btn" onclick="changeQty(${p.product_id},-1)">−</button>
         <span class="qty-num" id="qty-${p.product_id}">0</span>
-        <button class="qty-btn" onclick="changeQty(${p.product_id},1,${p.price},'${p.product_name}',${p.stock_quantity})">+</button>
+        <button class="qty-btn" onclick="changeQty(${p.product_id},1)">+</button>
       </div>
     </div>`).join('');
 }
 
-function changeQty(id, delta, price, name, stock) {
+function changeQty(id, delta) {
+  const {price, product_name:name, stock_quantity:stock} = productMap[id];
   if(!cart[id]) cart[id]={qty:0,price,name,stock};
   cart[id].qty = Math.max(0, Math.min(stock, cart[id].qty + delta));
   if(cart[id].qty===0) delete cart[id];
@@ -601,7 +622,7 @@ function updateCartSummary() {
   summary.style.display='block';
   const total = items.reduce((a,[,v])=>a+(v.qty*v.price),0);
   document.getElementById('cart-items-list').innerHTML =
-    items.map(([,v])=>`<div class="summary-item"><span>${v.name} x${v.qty}</span><span>${fmtRs(v.qty*v.price)}</span></div>`).join('') +
+    items.map(([,v])=>`<div class="summary-item"><span>${esc(v.name)} x${v.qty}</span><span>${fmtRs(v.qty*v.price)}</span></div>`).join('') +
     `<div class="summary-item"><span>Total</span><span>${fmtRs(total)}</span></div>`;
 }
 
@@ -659,9 +680,9 @@ function renderOrdersTable(containerId, orders, role, showActions=false) {
   if(showActions) cols+=`<th>Actions</th>`;
 
   const rows = orders.map(o=>{
-    const items = (o.items||[]).map(i=>`${i.product_name} x${i.quantity}`).join(', ')||'—';
+    const items = (o.items||[]).map(i=>`${esc(i.product_name)} x${i.quantity}`).join(', ')||'—';
     let cells = `<td><strong>#${o.order_id}</strong></td><td>${fmtDate(o.order_date)}</td>`;
-    if(role==='Admin') cells+=`<td>${o.customer_name||'—'}</td>`;
+    if(role==='Admin') cells+=`<td>${esc(o.customer_name)||'—'}</td>`;
     cells+=`<td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${items}</td>`;
     cells+=`<td>${fmtRs(o.total_amount)}</td><td>${statusBadge(o.order_status)}</td>`;
     if(role!=='Customer') cells+=`<td>${statusBadge(o.delivery_status||'Pending')}</td>`;
@@ -703,15 +724,15 @@ async function viewOrder(id) {
         <div class="tl-dot ${i<cur?'done':i===cur&&o.order_status!=='Cancelled'?'active':''}">${i<=cur&&o.order_status!=='Cancelled'?'✓':'○'}</div>
         <div class="tl-label">${s}</div>
       </div>`).join('');
-    const items=(o.items||[]).map(i=>`<div class="summary-item"><span>${i.product_name} x${i.quantity}</span><span>${fmtRs(i.price*i.quantity)}</span></div>`).join('');
+    const items=(o.items||[]).map(i=>`<div class="summary-item"><span>${esc(i.product_name)} x${i.quantity}</span><span>${fmtRs(i.price*i.quantity)}</span></div>`).join('');
     document.getElementById('order-modal-content').innerHTML=`
       <div class="timeline">${tl}</div>
       <div class="order-detail">
         <div class="detail-row"><span class="detail-label">Order ID</span><span>#${o.order_id}</span></div>
         <div class="detail-row"><span class="detail-label">Date</span><span>${fmtDate(o.order_date)}</span></div>
         <div class="detail-row"><span class="detail-label">Status</span><span>${statusBadge(o.order_status)}</span></div>
-        <div class="detail-row"><span class="detail-label">Payment</span><span>${o.payment_method} — ${statusBadge(o.payment_status||'Completed')}</span></div>
-        ${o.agent_name?`<div class="detail-row"><span class="detail-label">Delivery Agent</span><span>${o.agent_name}</span></div>`:''}
+        <div class="detail-row"><span class="detail-label">Payment</span><span>${esc(o.payment_method)} — ${statusBadge(o.payment_status||'Completed')}</span></div>
+        ${o.agent_name?`<div class="detail-row"><span class="detail-label">Delivery Agent</span><span>${esc(o.agent_name)}</span></div>`:''}
         ${o.delivery_date?`<div class="detail-row"><span class="detail-label">Delivered On</span><span>${fmtDate(o.delivery_date)}</span></div>`:''}
       </div>
       <div class="order-summary"><h4>Items</h4>${items}<div class="summary-item"><span>Total</span><span>${fmtRs(o.total_amount)}</span></div></div>`;
@@ -740,7 +761,7 @@ async function openAssign(orderId) {
   try {
     const agents = await api('GET','/users/agents');
     const sel = document.getElementById('assign-agent-select');
-    sel.innerHTML = agents.map(a=>`<option value="${a.user_id}">${a.name} (${a.contact_number})</option>`).join('');
+    sel.innerHTML = agents.map(a=>`<option value="${a.user_id}">${esc(a.name)} (${esc(a.contact_number)})</option>`).join('');
     document.getElementById('assign-modal').classList.add('show');
   } catch(e){toast(e.message,'error');}
 }

@@ -1,81 +1,75 @@
-# Order & Delivery Tracking System (ODTS)
-### BCSE301P — Prashast Awasthi | 23BCE0071
+﻿# ODTS: Order & Delivery Tracking System
 
-A full-stack web application for Order & Delivery Tracking.
+[![CI](https://github.com/awasthiprashast/Order-tracking-system/actions/workflows/ci.yml/badge.svg)](https://github.com/awasthiprashast/Order-tracking-system/actions/workflows/ci.yml)
 
----
+A full-stack order management app with three roles (customer, admin, delivery agent) covering the whole lifecycle: browse, order, assign, dispatch, deliver.
 
-## Tech Stack
-- **Backend:** Python + FastAPI + SQLite
-- **Frontend:** HTML / CSS / Vanilla JS (single file, no build step)
+**Live demo:** _add your Render URL here after deploying_ (the free tier sleeps when idle, so the first load can take about 30 seconds).
 
----
+Sign in with the one-click demo accounts on the login page:
 
-## Setup & Run
+| Role | Email | Password |
+|---|---|---|
+| Admin | admin@odts.com | admin123 |
+| Customer | prashast@odts.com | pass123 |
+| Delivery agent | ravi@odts.com | agent123 |
 
-### Step 1 — Install Python dependencies
-```bash
-cd backend
-pip install fastapi uvicorn pydantic
+> Demo data is reset whenever the server restarts. Do not enter real personal data.
+
+## Features
+- **Customer:** register and sign in, browse products, build a multi-item cart, choose a payment method (UPI, Card, NetBanking, COD), track orders on a timeline, and cancel before dispatch.
+- **Admin:** dashboard stats, view all orders, assign delivery agents, dispatch, and view revenue and order reports.
+- **Delivery agent:** see assigned deliveries and move them through Dispatched, Out for Delivery and Delivered.
+
+## Engineering notes
+- Role-based access control is enforced on the server, including ownership checks. Admin accounts can't be self-registered.
+- The order status workflow is a strict state machine (`Placed → Confirmed → Dispatched → Out for Delivery → Delivered`, with cancel allowed before dispatch).
+- Orders are placed in one transaction with an atomic stock check, so concurrent orders can't oversell. Cancelling restocks and refunds.
+- Passwords use salted PBKDF2-SHA256. Sessions expire after 12 hours, and login attempts are rate-limited.
+- Input is validated with Pydantic, and the frontend escapes all rendered data.
+- Covered by pytest tests that run in GitHub Actions.
+
+## Tech stack
+FastAPI, SQLite and Pydantic on the backend. The frontend is vanilla HTML, CSS and JS in a single file with no build step. FastAPI serves both the API (`/api/*`) and the UI (`/`).
+
+```
+frontend/index.html   single-page UI
+backend/main.py       REST API + static file serving
+backend/tests/        pytest suite
+render.yaml           Render deployment blueprint
 ```
 
-### Step 2 — Start the backend server
+## Run locally
 ```bash
 cd backend
+pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
-Backend runs at: http://localhost:8000  
-API docs (Swagger): http://localhost:8000/docs
+Open http://localhost:8000. Interactive API docs are at http://localhost:8000/docs.
 
-### Step 3 — Open the frontend
-Simply open `frontend/index.html` in your browser.
-(No server needed for frontend — it calls the local API directly.)
+Run the tests:
+```bash
+pip install -r requirements-dev.txt
+pytest tests
+```
 
----
+## Deploy to Render
+1. Push this repo to GitHub.
+2. In Render, choose **New → Blueprint** and select the repo. It picks up `render.yaml`.
+3. Deploy, then paste the resulting URL at the top of this README.
 
-## Demo Accounts (auto-seeded)
+## API overview
+| Method | Path | Access |
+|---|---|---|
+| POST | `/api/auth/register`, `/api/auth/login`, `/api/auth/logout` | public / authenticated |
+| GET | `/api/products` | public |
+| POST | `/api/orders` | customer |
+| GET | `/api/orders` | role-scoped (own orders, assigned orders, or all) |
+| PATCH | `/api/orders/{id}/status` | customer (cancel own), agent (assigned), admin |
+| POST | `/api/orders/{id}/assign` | admin |
+| GET | `/api/users/agents`, `/api/reports/summary` | admin |
 
-| Role           | Email                  | Password   |
-|----------------|------------------------|------------|
-| Admin          | admin@odts.com         | admin123   |
-| Customer       | prashast@odts.com      | pass123    |
-| Delivery Agent | ravi@odts.com          | agent123   |
+## Data model
+User, Product, Order, OrderItem, Payment and Delivery tables in SQLite (`ordertrack.db`, created and seeded on first run).
 
----
-
-## Features by Role
-
-### Customer
-- Register / Login
-- Browse products
-- Place orders (multi-item cart)
-- Select payment method (UPI / Card / NetBanking / COD)
-- View order history with status tracking
-- Cancel orders (before dispatch)
-- View order timeline and details
-
-### Admin
-- Dashboard with live stats (orders, revenue, customers)
-- View ALL orders from all customers
-- Assign delivery agents to orders
-- Update order status (Dispatch)
-- View reports and analytics
-
-### Delivery Agent
-- View assigned deliveries
-- Update delivery status: Assigned → Dispatched → Out for Delivery → Delivered
-
----
-
-## System Architecture
-Follows the **3-Tier Client-Server Architecture** as designed in the SE Lab:
-- **Presentation:** `frontend/index.html`
-- **Application:** `backend/main.py` (FastAPI REST API)
-- **Data:** SQLite database (`ordertrack.db`, auto-created on first run)
-
-## Entities (from ERD)
-- User (Customer / Admin / DeliveryAgent)
-- Product
-- Order + OrderItems
-- Payment
-- Delivery
+Built by [Prashast Awasthi](https://github.com/awasthiprashast) as an SE lab project (BCSE301P).
