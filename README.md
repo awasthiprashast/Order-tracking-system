@@ -16,6 +16,18 @@ Sign in with the one-click demo accounts on the login page:
 
 > Demo data is reset whenever the server restarts. Do not enter real personal data.
 
+## Screenshots
+| | |
+|---|---|
+| ![Login with demo accounts](docs/screenshots/login.png) | ![Admin dashboard](docs/screenshots/admin-dashboard.png) |
+| **Login with one-click demo accounts** | **Admin dashboard** |
+| ![Admin order management](docs/screenshots/admin-orders.png) | ![Order tracking timeline](docs/screenshots/order-tracking.png) |
+| **Admin: assign agents and dispatch** | **Customer: order tracking timeline** |
+| ![Customer placing an order](docs/screenshots/customer-place-order.png) | ![Delivery agent view](docs/screenshots/agent-deliveries.png) |
+| **Customer: place an order** | **Delivery agent: update deliveries** |
+
+<img src="docs/screenshots/mobile.png" alt="Mobile layout" width="260"/>
+
 ## Features
 - **Customer:** register and sign in, browse products, build a multi-item cart, choose a payment method (UPI, Card, NetBanking, COD), track orders on a timeline, and cancel before dispatch.
 - **Admin:** dashboard stats, view all orders, assign delivery agents, dispatch, and view revenue and order reports.
