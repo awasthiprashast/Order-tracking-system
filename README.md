@@ -4,7 +4,7 @@
 
 A full-stack order management app with three roles (customer, admin, delivery agent) covering the whole lifecycle: browse, order, assign, dispatch, deliver.
 
-**Live demo:** _add your Render URL here after deploying_ (the free tier sleeps when idle, so the first load can take about 30 seconds).
+**Live demo:** https://odts-order-tracking.onrender.com (the free tier sleeps when idle, so the first load can take about 30 seconds).
 
 Sign in with the one-click demo accounts on the login page:
 
