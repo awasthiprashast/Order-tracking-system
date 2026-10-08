@@ -84,4 +84,4 @@ pytest tests
 ## Data model
 User, Product, Order, OrderItem, Payment and Delivery tables in SQLite (`ordertrack.db`, created and seeded on first run).
 
-Built by [Prashast Awasthi](https://github.com/awasthiprashast) as an SE lab project (BCSE301P).
+Built by [Prashast Awasthi](https://github.com/awasthiprashast). Licensed under MIT.
